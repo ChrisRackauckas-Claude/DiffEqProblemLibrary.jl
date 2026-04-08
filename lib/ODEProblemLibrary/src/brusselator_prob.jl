@@ -117,18 +117,13 @@ function brusselator_1d_loop(du, u, p, t)
     A, B, alpha, dx = p
     alpha = alpha / dx^2
     N = N_brusselator_1d
-    @inbounds begin
-        du[1, 1] = 0
-        du[1, 2] = 0
-        du[N, 1] = 0
-        du[N, 2] = 0
-        for i in 2:(N - 1)
-            ip1, im1 = i + 1, i - 1
-            du[i, 1] = alpha * (u[im1, 1] + u[ip1, 1] - 2u[i, 1]) +
-                A + u[i, 1]^2 * u[i, 2] - (B + 1) * u[i, 1]
-            du[i, 2] = alpha * (u[im1, 2] + u[ip1, 2] - 2u[i, 2]) +
-                B * u[i, 1] - u[i, 1]^2 * u[i, 2]
-        end
+    @inbounds for i in 1:N
+        ip1 = limit(i + 1, N)
+        im1 = limit(i - 1, N)
+        du[i, 1] = alpha * (u[im1, 1] + u[ip1, 1] - 2u[i, 1]) +
+            A + u[i, 1]^2 * u[i, 2] - (B + 1) * u[i, 1]
+        du[i, 2] = alpha * (u[im1, 2] + u[ip1, 2] - 2u[i, 2]) +
+            B * u[i, 1] - u[i, 1]^2 * u[i, 2]
     end
 end
 
@@ -161,12 +156,12 @@ v(x,0) &= 3
 \end{align*}
 ```
 
-with the boundary condition
+with periodic boundary conditions
 
 ```math
 \begin{align*}
-u(0,t) = u(1,t) = 1 \\
-v(0,t) = v(1,t) = 3
+u(0,t) &= u(1,t) \\
+v(0,t) &= v(1,t)
 \end{align*}
 ```
 
@@ -176,5 +171,5 @@ prob_ode_brusselator_1d = ODEProblem(
     brusselator_1d_loop,
     init_brusselator_1d(N_brusselator_1d),
     (0.0, 10.0),
-    (1.0, 3.0, 0.02, 1.0 / (N_brusselator_1d - 1))
+    (1.0, 3.0, 0.02, 1.0 / N_brusselator_1d)
 )
