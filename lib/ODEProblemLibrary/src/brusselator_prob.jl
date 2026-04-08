@@ -116,13 +116,19 @@ const N_brusselator_1d = 40
 function brusselator_1d_loop(du, u, p, t)
     A, B, alpha, dx = p
     alpha = alpha / dx^2
-    return @inbounds for i in 2:(N - 1)
-        x = xyd_brusselator[i]
-        ip1, im1 = i + 1, i - 1
-        du[i, 1] = alpha * (u[im1, 1] + u[ip1, 1] - 2u[i, 1]) +
-            A + u[i, 1]^2 * u[i, 2] - (B + 1) * u[i, 1]
-        du[i, 2] = alpha * (u[im1, 2] + u[ip1, 2] - 2u[i, 2]) +
-            B * u[i, 1] - u[i, 1]^2 * u[i, 2]
+    N = N_brusselator_1d
+    @inbounds begin
+        du[1, 1] = 0
+        du[1, 2] = 0
+        du[N, 1] = 0
+        du[N, 2] = 0
+        for i in 2:(N - 1)
+            ip1, im1 = i + 1, i - 1
+            du[i, 1] = alpha * (u[im1, 1] + u[ip1, 1] - 2u[i, 1]) +
+                A + u[i, 1]^2 * u[i, 2] - (B + 1) * u[i, 1]
+            du[i, 2] = alpha * (u[im1, 2] + u[ip1, 2] - 2u[i, 2]) +
+                B * u[i, 1] - u[i, 1]^2 * u[i, 2]
+        end
     end
 end
 
@@ -170,5 +176,5 @@ prob_ode_brusselator_1d = ODEProblem(
     brusselator_1d_loop,
     init_brusselator_1d(N_brusselator_1d),
     (0.0, 10.0),
-    (1.0, 3.0, 1 / 41, zeros(N_brusselator_1d))
+    (1.0, 3.0, 0.02, 1.0 / (N_brusselator_1d - 1))
 )
