@@ -1,6 +1,6 @@
 name = "DAEProblemLibrary"
 uuid = "dfb8ca35-80a1-48ba-a605-84916a45b4f8"
-version = "0.1.2"
+version = "0.1.3"
 
 [deps]
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
@@ -8,7 +8,7 @@ Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [compat]
 Aqua = "0.8"
-DiffEqBase = "6"
+DiffEqBase = "6, 7"
 Markdown = "1.10"
 julia = "1.10"
 
