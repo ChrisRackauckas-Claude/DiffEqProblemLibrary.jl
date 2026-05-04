@@ -1,16 +1,18 @@
 name = "JumpProblemLibrary"
 uuid = "faf0f6d7-8cee-47cb-b27c-1eb80cef534e"
-version = "1.2.0"
+version = "2.0.0"
 
 [deps]
 Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+JumpProcesses = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
 RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 
 [compat]
 Aqua = "0.8"
-Catalyst = "15"
-DiffEqBase = "6"
+Catalyst = "16"
+DiffEqBase = "6, 7"
+JumpProcesses = "9"
 RuntimeGeneratedFunctions = "0.5"
 julia = "1.10"
 

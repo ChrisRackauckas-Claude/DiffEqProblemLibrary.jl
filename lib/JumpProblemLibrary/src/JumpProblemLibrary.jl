@@ -1,6 +1,6 @@
 module JumpProblemLibrary
 
-using DiffEqBase, Catalyst
+using DiffEqBase, Catalyst, JumpProcesses
 
 import RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
@@ -12,20 +12,60 @@ export prob_jump_dnarepressor, prob_jump_constproduct, prob_jump_nonlinrxs,
     # examples used in published benchmarks / comparisons
     prob_jump_multistate, prob_jump_twentygenes, prob_jump_dnadimer_repressor,
     # examples approximating diffusion by continuous time random walks
-    prob_jump_diffnetwork
+    prob_jump_diffnetwork,
+    # Builder helper for v2.0+ consumers
+    build_jump_problem
 
 """
-General structure to hold JumpProblem info. Needed since
-the JumpProblem constructor requires the algorithm, so we
-don't create the JumpProblem here.
+    JumpProblemNetwork
+
+General structure to hold the inputs needed to construct a `JumpProblem` from
+a Catalyst `ReactionSystem`. Stores raw inputs (`network`, `rates`, `u0`,
+`tstop`); use [`build_jump_problem`](@ref) to materialize the actual
+`JumpProblem` with the aggregator of your choice.
+
+!!! note "v2.0 migration"
+    In v1.x the `discrete_prob` field held a pre-constructed
+    `DiscreteProblem` built directly from the `ReactionSystem`. SciMLBase v3
+    no longer supports that constructor and prohibits `DiscreteProblem` from
+    jump-bearing systems entirely, so this field is now `nothing` for every
+    problem in the library. Consumer code that previously did
+
+    ```julia
+    rn = jpn.network; prob = jpn.discrete_prob
+    JumpProblem(rn, prob, Direct())
+    ```
+
+    should switch to
+
+    ```julia
+    build_jump_problem(jpn, Direct())
+    # or directly:
+    JumpProblem(jpn.network, jpn.u0, (0.0, jpn.tstop), jpn.rates; aggregator = Direct())
+    ```
 """
 struct JumpProblemNetwork
-    network::Any         # Catalyst network
+    network::Any         # Catalyst network (ReactionSystem)
     rates::Any           # vector of rate constants or nothing
     tstop::Any           # time to end simulation
     u0::Any              # initial values
-    discrete_prob::Any   # initialized discrete problem
+    discrete_prob::Any   # always `nothing` in v2.0+; see migration note above
     prob_data::Any       # additional problem data, stored as a Dict
+end
+
+"""
+    build_jump_problem(jpn::JumpProblemNetwork, aggregator; kwargs...)
+
+Construct a `JumpProcesses.JumpProblem` from a [`JumpProblemNetwork`](@ref)
+using the supplied stochastic-simulation aggregator (e.g. `Direct()`,
+`SortingDirect()`, `RSSA()`, `RSSACR()`, `DirectCR()`, ...). All keyword
+arguments are forwarded to `JumpProblem`.
+"""
+function build_jump_problem(jpn::JumpProblemNetwork, aggregator;
+        save_positions = (true, true), kwargs...)
+    p = jpn.rates === nothing ? DiffEqBase.NullParameters() : jpn.rates
+    return JumpProblem(jpn.network, jpn.u0, (0.0, jpn.tstop), p;
+        aggregator, save_positions, kwargs...)
 end
 
 dna_rs = @reaction_network begin
@@ -46,7 +86,7 @@ rates = [
 ]
 tf = 1000.0
 u0 = [:DNA => 1, :mRNA => 0, :P => 0, :DNAR => 0]
-prob = DiscreteProblem(dna_rs, u0, (0.0, tf), rates, eval_module = @__MODULE__)
+prob = nothing
 Nsims = 8000
 expected_avg = 5.92655375e+2
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean" => expected_avg)
@@ -62,7 +102,7 @@ end
 rates = [:k1 => 1000.0, :k2 => 10.0]
 tf = 1.0
 u0 = [:A => 0]
-prob = DiscreteProblem(bd_rs, u0, (0.0, tf), rates, eval_module = @__MODULE__)
+prob = nothing
 Nsims = 16000
 expected_avg = t -> rates[1] / rates[2] .* (1.0 - exp.(-rates[2] * t))
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean_at_t" => expected_avg)
@@ -81,7 +121,7 @@ end
 rates = [:k1 => 1.0, :k2 => 2.0, :k3 => 0.5, :k4 => 0.75, :k5 => 0.25]
 tf = 0.01
 u0 = [:A => 200, :B => 100, :C => 150]
-prob = DiscreteProblem(nonlin_rs, u0, (0.0, tf), rates, eval_module = @__MODULE__)
+prob = nothing
 Nsims = 32000
 expected_avg = 84.876015624999994
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean" => expected_avg)
@@ -107,7 +147,7 @@ u0 = [
     :SP2 => 50.0,
 ]  # Hill equations force use of floats!
 tf = 4000.0
-prob = DiscreteProblem(oscil_rs, u0, (0.0, tf), eval_module = @__MODULE__)
+prob = nothing
 """
 Oscillatory system, uses a mixture of jump types.
 """
@@ -166,7 +206,7 @@ u0 = [
     :S6 => 0, :S7 => 0, :S8 => 0, :S9 => 0,
 ]
 tf = 100.0
-prob = DiscreteProblem(rs, u0, (0.0, tf), rates, eval_module = @__MODULE__)
+prob = nothing
 """
 Multistate model from Gupta and Mendes,
 "An Overview of Network-Based and -Free Approaches for Stochastic Simulation of Biochemical Systems",
@@ -222,7 +262,7 @@ for i in 1:(2 * N)
     u0[findfirst(isequal(G[i]), unknowns(rs))] = (G[i] => 1)
 end
 tf = 2000.0
-prob = DiscreteProblem(rs, u0, (0.0, tf), eval_module = @__MODULE__)
+prob = nothing
 
 """
 Twenty-gene model from McCollum et al,
@@ -248,7 +288,7 @@ rnpar = [
 varlabels = ["G", "M", "P", "P2", "P2G"]
 u0 = [:G => 1000, :M => 0, :P => 0, :P2 => 0, :P2G => 0]
 tf = 4000.0
-prob = DiscreteProblem(rn, u0, (0.0, tf), rnpar, eval_module = @__MODULE__)
+prob = nothing
 """
 Negative feedback autoregulatory gene expression model. Dimer is the repressor.
 Taken from Marchetti, Priami and Thanh,
