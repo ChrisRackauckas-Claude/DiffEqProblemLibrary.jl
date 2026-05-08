@@ -1,6 +1,6 @@
 module JumpProblemLibrary
 
-using DiffEqBase, Catalyst, JumpProcesses
+using Catalyst
 
 import RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
@@ -12,60 +12,26 @@ export prob_jump_dnarepressor, prob_jump_constproduct, prob_jump_nonlinrxs,
     # examples used in published benchmarks / comparisons
     prob_jump_multistate, prob_jump_twentygenes, prob_jump_dnadimer_repressor,
     # examples approximating diffusion by continuous time random walks
-    prob_jump_diffnetwork,
-    # Builder helper for v2.0+ consumers
-    build_jump_problem
+    prob_jump_diffnetwork
 
 """
     JumpProblemNetwork
 
-General structure to hold the inputs needed to construct a `JumpProblem` from
-a Catalyst `ReactionSystem`. Stores raw inputs (`network`, `rates`, `u0`,
-`tstop`); use [`build_jump_problem`](@ref) to materialize the actual
-`JumpProblem` with the aggregator of your choice.
+Container for the inputs needed to construct a `JumpProblem` from a
+Catalyst `ReactionSystem`. Consumers materialize the actual `JumpProblem`
+via the Catalyst API:
 
-!!! note "v2.0 migration"
-    In v1.x the `discrete_prob` field held a pre-constructed
-    `DiscreteProblem` built directly from the `ReactionSystem`. SciMLBase v3
-    no longer supports that constructor and prohibits `DiscreteProblem` from
-    jump-bearing systems entirely, so this field is now `nothing` for every
-    problem in the library. Consumer code that previously did
-
-    ```julia
-    rn = jpn.network; prob = jpn.discrete_prob
-    JumpProblem(rn, prob, Direct())
-    ```
-
-    should switch to
-
-    ```julia
-    build_jump_problem(jpn, Direct())
-    # or directly:
-    JumpProblem(jpn.network, jpn.u0, (0.0, jpn.tstop), jpn.rates; aggregator = Direct())
-    ```
+```julia
+using JumpProcesses
+JumpProblem(jpn.network, jpn.u0, (0.0, jpn.tstop), jpn.rates; aggregator = Direct())
+```
 """
 struct JumpProblemNetwork
-    network::Any         # Catalyst network (ReactionSystem)
+    network::Any         # Catalyst ReactionSystem
     rates::Any           # vector of rate constants or nothing
     tstop::Any           # time to end simulation
     u0::Any              # initial values
-    discrete_prob::Any   # always `nothing` in v2.0+; see migration note above
     prob_data::Any       # additional problem data, stored as a Dict
-end
-
-"""
-    build_jump_problem(jpn::JumpProblemNetwork, aggregator; kwargs...)
-
-Construct a `JumpProcesses.JumpProblem` from a [`JumpProblemNetwork`](@ref)
-using the supplied stochastic-simulation aggregator (e.g. `Direct()`,
-`SortingDirect()`, `RSSA()`, `RSSACR()`, `DirectCR()`, ...). All keyword
-arguments are forwarded to `JumpProblem`.
-"""
-function build_jump_problem(jpn::JumpProblemNetwork, aggregator;
-        save_positions = (true, true), kwargs...)
-    p = jpn.rates === nothing ? DiffEqBase.NullParameters() : jpn.rates
-    return JumpProblem(jpn.network, jpn.u0, (0.0, jpn.tstop), p;
-        aggregator, save_positions, kwargs...)
 end
 
 dna_rs = @reaction_network begin
@@ -86,14 +52,13 @@ rates = [
 ]
 tf = 1000.0
 u0 = [:DNA => 1, :mRNA => 0, :P => 0, :DNAR => 0]
-prob = nothing
 Nsims = 8000
 expected_avg = 5.92655375e+2
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean" => expected_avg)
 """
 DNA negative feedback autoregulatory model. Protein acts as repressor.
 """
-prob_jump_dnarepressor = JumpProblemNetwork(dna_rs, rates, tf, u0, prob, prob_data)
+prob_jump_dnarepressor = JumpProblemNetwork(dna_rs, rates, tf, u0, prob_data)
 
 bd_rs = @reaction_network begin
     k1, 0 --> A
@@ -102,14 +67,13 @@ end
 rates = [:k1 => 1000.0, :k2 => 10.0]
 tf = 1.0
 u0 = [:A => 0]
-prob = nothing
 Nsims = 16000
 expected_avg = t -> rates[1] / rates[2] .* (1.0 - exp.(-rates[2] * t))
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean_at_t" => expected_avg)
 """
 Simple birth-death process with constant production and degradation.
 """
-prob_jump_constproduct = JumpProblemNetwork(bd_rs, rates, tf, u0, prob, prob_data)
+prob_jump_constproduct = JumpProblemNetwork(bd_rs, rates, tf, u0, prob_data)
 
 nonlin_rs = @reaction_network begin
     k1, 2A --> B
@@ -121,14 +85,13 @@ end
 rates = [:k1 => 1.0, :k2 => 2.0, :k3 => 0.5, :k4 => 0.75, :k5 => 0.25]
 tf = 0.01
 u0 = [:A => 200, :B => 100, :C => 150]
-prob = nothing
 Nsims = 32000
 expected_avg = 84.876015624999994
 prob_data = Dict("num_sims_for_mean" => Nsims, "expected_mean" => expected_avg)
 """
 Example with a mix of nonlinear reactions, including third order
 """
-prob_jump_nonlinrxs = JumpProblemNetwork(nonlin_rs, rates, tf, u0, prob, prob_data)
+prob_jump_nonlinrxs = JumpProblemNetwork(nonlin_rs, rates, tf, u0, prob_data)
 
 oscil_rs = @reaction_network begin
     0.01, (X, Y, Z) --> 0
@@ -147,11 +110,10 @@ u0 = [
     :SP2 => 50.0,
 ]  # Hill equations force use of floats!
 tf = 4000.0
-prob = nothing
 """
 Oscillatory system, uses a mixture of jump types.
 """
-prob_jump_osc_mixed_jumptypes = JumpProblemNetwork(oscil_rs, nothing, tf, u0, prob, nothing)
+prob_jump_osc_mixed_jumptypes = JumpProblemNetwork(oscil_rs, nothing, tf, u0, nothing)
 
 specs_sym_to_name = Dict(
     :S1 => "R(a,l)",
@@ -206,7 +168,6 @@ u0 = [
     :S6 => 0, :S7 => 0, :S8 => 0, :S9 => 0,
 ]
 tf = 100.0
-prob = nothing
 """
 Multistate model from Gupta and Mendes,
 "An Overview of Network-Based and -Free Approaches for Stochastic Simulation of Biochemical Systems",
@@ -214,7 +175,7 @@ Computation 2018, 6, 9; doi:10.3390/computation6010009
 Translated from supplementary data file: Models/Multi-state/fixed_multistate.xml
 """
 prob_jump_multistate = JumpProblemNetwork(
-    rs, rates, tf, u0, prob,
+    rs, rates, tf, u0,
     Dict(
         "specs_to_sym_name" => specs_sym_to_name,
         "rates_sym_to_idx" => rsi, "params" => params
@@ -262,14 +223,13 @@ for i in 1:(2 * N)
     u0[findfirst(isequal(G[i]), unknowns(rs))] = (G[i] => 1)
 end
 tf = 2000.0
-prob = nothing
 
 """
 Twenty-gene model from McCollum et al,
 "The sorting direct method for stochastic simulation of biochemical systems with varying reaction execution behavior"
 Comp. Bio. and Chem., 30, pg. 39-49 (2006).
 """
-prob_jump_twentygenes = JumpProblemNetwork(rs, nothing, tf, u0, prob, nothing)
+prob_jump_twentygenes = JumpProblemNetwork(rs, nothing, tf, u0, nothing)
 
 rn = @reaction_network begin
     c1, G --> G + M
@@ -288,7 +248,6 @@ rnpar = [
 varlabels = ["G", "M", "P", "P2", "P2G"]
 u0 = [:G => 1000, :M => 0, :P => 0, :P2 => 0, :P2G => 0]
 tf = 4000.0
-prob = nothing
 """
 Negative feedback autoregulatory gene expression model. Dimer is the repressor.
 Taken from Marchetti, Priami and Thanh,
@@ -296,7 +255,7 @@ Taken from Marchetti, Priami and Thanh,
 Springer (2017).
 """
 prob_jump_dnadimer_repressor = JumpProblemNetwork(
-    rn, rnpar, tf, u0, prob,
+    rn, rnpar, tf, u0,
     Dict("specs_names" => varlabels)
 )
 
@@ -326,8 +285,7 @@ network given the number of lattice sites.
 u0 is a similar function that returns the initial condition vector.
 """
 prob_jump_diffnetwork = JumpProblemNetwork(
-    getDiffNetwork, params, tf, getDiffu0, nothing,
-    nothing
+    getDiffNetwork, params, tf, getDiffu0, nothing
 )
 
 end # module
