@@ -13,6 +13,15 @@ ODEProblemLibrary = "fdc4e326-1af4-4b90-96e7-779fcce2daa5"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 SDEProblemLibrary = "c72e72a9-a271-4b2b-8966-303ed956772e"
 
+[sources]
+BVProblemLibrary = {path = "lib/BVProblemLibrary"}
+DAEProblemLibrary = {path = "lib/DAEProblemLibrary"}
+DDEProblemLibrary = {path = "lib/DDEProblemLibrary"}
+JumpProblemLibrary = {path = "lib/JumpProblemLibrary"}
+NonlinearProblemLibrary = {path = "lib/NonlinearProblemLibrary"}
+ODEProblemLibrary = {path = "lib/ODEProblemLibrary"}
+SDEProblemLibrary = {path = "lib/SDEProblemLibrary"}
+
 [compat]
 BVProblemLibrary = "0.1"
 DAEProblemLibrary = "0.1"
